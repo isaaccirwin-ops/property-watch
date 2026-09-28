@@ -1,122 +1,236 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import React, { useState, useEffect } from 'react';
+import { Header } from './components/Header';
+import { Navigation, NavTabId } from './components/Navigation';
+import { CommandPalette } from './components/CommandPalette';
+import { OverviewView } from './components/views/OverviewView';
+import { AssetDetailView } from './components/views/AssetDetailView';
+import { UnderwriterView } from './components/views/UnderwriterView';
+import { PipelineView } from './components/views/PipelineView';
+import { CapitalMarketsView } from './components/views/CapitalMarketsView';
+import { ReportingView } from './components/views/ReportingView';
+import { NewDealModal } from './components/modals/NewDealModal';
+import { TenantDetailModal } from './components/modals/TenantDetailModal';
+import { 
+  INITIAL_PROPERTIES, 
+  INITIAL_LOANS, 
+  INITIAL_PIPELINE, 
+  INITIAL_COMPS, 
+  MACRO_INDICATORS 
+} from './data/portfolioData';
+import { Property, Tenant, DealPipelineItem, MacroIndicator } from './types/realEstate';
+import { CurrencyCode } from './utils/financialModels';
 
-function App() {
-  const [count, setCount] = useState(0)
+export const App: React.FC = () => {
+  const [properties, setProperties] = useState<Property[]>(INITIAL_PROPERTIES);
+  const [loans, setLoans] = useState(INITIAL_LOANS);
+  const [pipeline, setPipeline] = useState<DealPipelineItem[]>(INITIAL_PIPELINE);
+  const [comps, setComps] = useState(INITIAL_COMPS);
+  const [macroIndicators, setMacroIndicators] = useState<MacroIndicator[]>(MACRO_INDICATORS);
+
+  const [activeTab, setActiveTab] = useState<NavTabId>('overview');
+  const [selectedPropertyId, setSelectedPropertyId] = useState<string>(INITIAL_PROPERTIES[0].id);
+  const [currentFund, setCurrentFund] = useState<string>('Global Core Flagship Fund IV');
+  const [currency, setCurrency] = useState<CurrencyCode>('USD');
+  const [isDark, setIsDark] = useState<boolean>(() => {
+    return localStorage.getItem('propertywatch-theme') !== 'light';
+  });
+  const [isSimulating, setIsSimulating] = useState<boolean>(true);
+
+  // Modals state
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [isNewDealModalOpen, setIsNewDealModalOpen] = useState(false);
+  const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
+
+  // Toggle Theme handler
+  const handleToggleTheme = () => {
+    const nextTheme = !isDark;
+    setIsDark(nextTheme);
+    const themeStr = nextTheme ? 'dark' : 'light';
+    localStorage.setItem('propertywatch-theme', themeStr);
+    document.documentElement.setAttribute('data-theme', themeStr);
+  };
+
+  // Keyboard shortcut listener for Command Palette (Cmd+K)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsCommandPaletteOpen(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Live Telemetry Simulation Engine (subtle pulse updates every 4 seconds when active)
+  useEffect(() => {
+    if (!isSimulating) return;
+
+    const interval = setInterval(() => {
+      // Jiggle power consumption and telemetry slightly for realism
+      setProperties(prev => prev.map(p => {
+        const deltaPower = Math.floor(Math.random() * 21) - 10; // -10 to +10 kW
+        const newPower = Math.max(100, p.telemetry.powerDrawKw + deltaPower);
+        return {
+          ...p,
+          telemetry: {
+            ...p.telemetry,
+            powerDrawKw: newPower
+          }
+        };
+      }));
+
+      // Occasionally tweak treasury yield
+      setMacroIndicators(prev => prev.map(m => {
+        if (m.ticker === 'US10Y') {
+          const deltaBps = (Math.random() * 0.02 - 0.01).toFixed(2);
+          const currentVal = parseFloat(m.value);
+          const nextVal = (currentVal + parseFloat(deltaBps)).toFixed(2);
+          return {
+            ...m,
+            value: `${nextVal}%`
+          };
+        }
+        return m;
+      }));
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, [isSimulating]);
+
+  // Handle pipeline deal progression
+  const handleAdvanceDeal = (dealId: string) => {
+    const stageOrder: DealPipelineItem['stage'][] = [
+      'Sourced', 'Underwriting', 'LOI Submitted', 'Due Diligence', 'IC Approval', 'Closed'
+    ];
+
+    setPipeline(prev => prev.map(deal => {
+      if (deal.id === dealId) {
+        const currentIndex = stageOrder.indexOf(deal.stage);
+        if (currentIndex < stageOrder.length - 1) {
+          return { ...deal, stage: stageOrder[currentIndex + 1] };
+        }
+      }
+      return deal;
+    }));
+  };
+
+  // Handle add new deal from modal
+  const handleAddDeal = (newDeal: DealPipelineItem) => {
+    setPipeline(prev => [newDeal, ...prev]);
+    setActiveTab('pipeline');
+  };
+
+  // Drill in property selection
+  const handleSelectProperty = (id: string) => {
+    setSelectedPropertyId(id);
+    setActiveTab('asset-detail');
+  };
+
+  const activeProperty = properties.find(p => p.id === selectedPropertyId);
+  const totalAum = properties.reduce((acc, p) => acc + p.currentValuation, 0);
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <div className="app-container">
+      {/* Institutional Capital Header */}
+      <Header
+        currentFund={currentFund}
+        onSelectFund={setCurrentFund}
+        currency={currency}
+        onChangeCurrency={setCurrency}
+        isDark={isDark}
+        onToggleTheme={handleToggleTheme}
+        isSimulating={isSimulating}
+        onToggleSimulation={() => setIsSimulating(!isSimulating)}
+        onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
+        onOpenNewDealModal={() => setIsNewDealModalOpen(true)}
+        macroIndicators={macroIndicators}
+        totalAum={totalAum}
+      />
 
-      <div className="ticks"></div>
+      {/* Navigation Sub-system Bar */}
+      <Navigation
+        activeTab={activeTab}
+        onSelectTab={setActiveTab}
+        activePropertyName={activeProperty?.name}
+      />
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+      {/* Main Dynamic Viewport */}
+      <main className="main-view-container">
+        {activeTab === 'overview' && (
+          <OverviewView
+            properties={properties}
+            onSelectProperty={handleSelectProperty}
+            currency={currency}
+          />
+        )}
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
-}
+        {activeTab === 'asset-detail' && (
+          <AssetDetailView
+            properties={properties}
+            selectedPropertyId={selectedPropertyId}
+            onSelectPropertyId={setSelectedPropertyId}
+            currency={currency}
+            onOpenTenantModal={(t) => setSelectedTenant(t)}
+          />
+        )}
 
-export default App
+        {activeTab === 'underwriter' && (
+          <UnderwriterView currency={currency} />
+        )}
+
+        {activeTab === 'pipeline' && (
+          <PipelineView
+            pipeline={pipeline}
+            comps={comps}
+            currency={currency}
+            onAdvanceDeal={handleAdvanceDeal}
+            onOpenNewDealModal={() => setIsNewDealModalOpen(true)}
+            onSendToUnderwriter={() => setActiveTab('underwriter')}
+          />
+        )}
+
+        {activeTab === 'capital-markets' && (
+          <CapitalMarketsView
+            loans={loans}
+            properties={properties}
+            currency={currency}
+          />
+        )}
+
+        {activeTab === 'reporting' && (
+          <ReportingView
+            properties={properties}
+            loans={loans}
+            currency={currency}
+          />
+        )}
+      </main>
+
+      {/* Global Modals */}
+      <CommandPalette
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        properties={properties}
+        onSelectProperty={handleSelectProperty}
+        onNavigateTab={setActiveTab}
+        currency={currency}
+      />
+
+      <NewDealModal
+        isOpen={isNewDealModalOpen}
+        onClose={() => setIsNewDealModalOpen(false)}
+        onAddDeal={handleAddDeal}
+        currency={currency}
+      />
+
+      <TenantDetailModal
+        tenant={selectedTenant}
+        onClose={() => setSelectedTenant(null)}
+        currency={currency}
+      />
+    </div>
+  );
+};
+
+export default App;
