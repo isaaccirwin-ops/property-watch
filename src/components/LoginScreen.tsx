@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { AppUser } from '../types/user';
-import { ShieldCheck, User } from 'lucide-react';
+import { NeonService } from '../services/neonService';
+import { ShieldCheck, User, Database, AlertCircle, ArrowRight } from 'lucide-react';
 
 interface LoginScreenProps {
   onLogin: (user: AppUser) => void;
@@ -17,83 +18,50 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
     e.preventDefault();
     setError('');
 
-    if (!email.trim() || !password.trim()) {
-      setError('Please enter both email and password.');
+    if (!email.trim()) {
+      setError('Please enter your email address.');
       return;
     }
 
     setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 600));
 
-    // Admin detection
-    const normalizedEmail = email.toLowerCase().trim();
-    if (normalizedEmail.includes('admin') || normalizedEmail.includes('cody')) {
-      const adminUser: AppUser = {
-        id: '2ea9da70-e1da-45b5-b63d-907791801107',
-        name: 'Cody Irwin (Admin)',
-        email: 'admin@propertywatch.com',
-        role: 'admin',
-        companyName: 'PropertyWatch Global Inc.',
-        phone: '+1 (555) 019-2834',
-        planTier: 'enterprise',
-        billingStatus: 'active',
-        monthlySpend: 0,
-        billingCycle: 'annual',
-        createdAt: new Date().toISOString()
-      };
+    try {
+      const authResult = await NeonService.authenticate(email, password);
       setIsLoading(false);
-      onLogin(adminUser);
-      return;
+
+      if (authResult.success && authResult.user) {
+        onLogin(authResult.user);
+      } else {
+        setError(authResult.message || 'Login failed. Please check your credentials.');
+      }
+    } catch (err: any) {
+      setIsLoading(false);
+      setError('Connection to database timed out. Please try again.');
     }
+  };
 
-    // Default customer
-    const customerUser: AppUser = {
-      id: 'bc6b7e5f-bab1-4761-8115-1a0828a7c2aa',
-      name: email.split('@')[0].replace('.', ' '),
-      email: email,
-      role: 'customer',
-      companyName: 'Institutional Capital Partners',
-      planTier: 'pro',
-      billingStatus: 'active',
-      monthlySpend: 1499,
-      billingCycle: 'monthly',
-      createdAt: new Date().toISOString()
-    };
+  const handleQuickAdminLogin = async () => {
+    setIsLoading(true);
+    setError('');
+    setEmail('isaaccirwin@gmail.com');
+    setPassword('12345');
+    const authResult = await NeonService.authenticate('isaaccirwin@gmail.com', '12345');
     setIsLoading(false);
-    onLogin(customerUser);
+    if (authResult.success && authResult.user) {
+      onLogin(authResult.user);
+    }
   };
 
-  const handleQuickAdminLogin = () => {
-    const adminUser: AppUser = {
-      id: '2ea9da70-e1da-45b5-b63d-907791801107',
-      name: 'Cody Irwin (Admin)',
-      email: 'admin@propertywatch.com',
-      role: 'admin',
-      companyName: 'PropertyWatch Global Inc.',
-      phone: '+1 (555) 019-2834',
-      planTier: 'enterprise',
-      billingStatus: 'active',
-      monthlySpend: 0,
-      billingCycle: 'annual',
-      createdAt: new Date().toISOString()
-    };
-    onLogin(adminUser);
-  };
-
-  const handleQuickCustomerLogin = () => {
-    const customerUser: AppUser = {
-      id: 'bc6b7e5f-bab1-4761-8115-1a0828a7c2aa',
-      name: 'Sarah Jenkins',
-      email: 'sarah.jenkins@blackrockre.com',
-      role: 'customer',
-      companyName: 'Blackstone Real Estate Partners',
-      planTier: 'pro',
-      billingStatus: 'active',
-      monthlySpend: 1499,
-      billingCycle: 'monthly',
-      createdAt: new Date().toISOString()
-    };
-    onLogin(customerUser);
+  const handleQuickCustomerLogin = async () => {
+    setIsLoading(true);
+    setError('');
+    setEmail('sarah.jenkins@blackrockre.com');
+    setPassword('client123');
+    const authResult = await NeonService.authenticate('sarah.jenkins@blackrockre.com', 'client123');
+    setIsLoading(false);
+    if (authResult.success && authResult.user) {
+      onLogin(authResult.user);
+    }
   };
 
   return (
@@ -112,6 +80,22 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
             <span className="login-brand-tagline">Institutional Real Estate Operating System</span>
           </div>
 
+          {/* Database Connection Status */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '6px',
+            marginBottom: '1rem',
+            fontSize: '0.72rem',
+            color: '#16A34A',
+            fontWeight: 600
+          }}>
+            <Database size={12} />
+            <span>Connected to Neon Postgres</span>
+            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#16A34A' }}></span>
+          </div>
+
           {/* Quick Demo Login Switcher */}
           <div style={{
             background: 'var(--bg-input)',
@@ -120,52 +104,50 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
             marginBottom: '1.25rem',
             border: '1px solid var(--border-subtle)'
           }}>
-            <div style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.5rem', textAlign: 'center' }}>
-              ⚡ 1-CLICK INSTANT LOGIN (NEON BACKED)
+            <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.5rem', textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              ⚡ 1-Click Instant Sign-In
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
               <button
                 type="button"
                 onClick={handleQuickAdminLogin}
                 className="btn btn-sm btn-primary"
-                style={{ fontSize: '0.74rem', padding: '0.4rem 0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
+                style={{ fontSize: '0.74rem', padding: '0.45rem 0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}
+                disabled={isLoading}
               >
-                <ShieldCheck size={13} />
-                <span>Admin Account</span>
+                <ShieldCheck size={14} />
+                <span>Admin (IsaacI)</span>
               </button>
               <button
                 type="button"
                 onClick={handleQuickCustomerLogin}
                 className="btn btn-sm btn-secondary"
-                style={{ fontSize: '0.74rem', padding: '0.4rem 0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
+                style={{ fontSize: '0.74rem', padding: '0.45rem 0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}
+                disabled={isLoading}
               >
-                <User size={13} />
-                <span>Customer Account</span>
+                <User size={14} />
+                <span>Client (Blackstone)</span>
               </button>
             </div>
           </div>
 
           {/* Error message */}
           {error && (
-            <div className="login-error">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="10"/>
-                <line x1="15" y1="9" x2="9" y2="15"/>
-                <line x1="9" y1="9" x2="15" y2="15"/>
-              </svg>
-              {error}
+            <div className="login-error" style={{ marginBottom: '1rem' }}>
+              <AlertCircle size={15} style={{ flexShrink: 0 }} />
+              <span>{error}</span>
             </div>
           )}
 
           {/* Login form */}
           <form className="login-form" onSubmit={handleSubmit}>
             <div className="login-field">
-              <label className="login-label" htmlFor="login-email">Email address</label>
+              <label className="login-label" htmlFor="login-email">Email Address</label>
               <input
                 id="login-email"
                 className="login-input"
                 type="email"
-                placeholder="admin@propertywatch.com"
+                placeholder="isaaccirwin@gmail.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 autoComplete="email"
@@ -205,12 +187,19 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
               className="login-submit"
               disabled={isLoading}
             >
-              {isLoading ? 'Signing in with Neon...' : 'Sign in'}
+              {isLoading ? (
+                'Verifying with Neon...'
+              ) : (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                  <span>Sign In</span>
+                  <ArrowRight size={14} />
+                </span>
+              )}
             </button>
           </form>
 
-          <div className="login-footer">
-            Admin credentials: <code>admin@propertywatch.com</code> / <code>admin123</code>
+          <div className="login-footer" style={{ marginTop: '1.25rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+            Admin Credentials: <code>isaaccirwin@gmail.com</code> / <code>12345</code>
           </div>
         </div>
       </div>

@@ -9,7 +9,7 @@ import { UnderwriterView } from './components/views/UnderwriterView';
 import { PipelineView } from './components/views/PipelineView';
 import { CapitalMarketsView } from './components/views/CapitalMarketsView';
 import { ReportingView } from './components/views/ReportingView';
-import { AdminView } from './components/views/AdminView';
+import { AdminConsole } from './components/views/AdminConsole';
 import { NewDealModal } from './components/modals/NewDealModal';
 import { TenantDetailModal } from './components/modals/TenantDetailModal';
 import { 
@@ -23,11 +23,12 @@ import { Property, Tenant, DealPipelineItem, MacroIndicator } from './types/real
 import { AppUser } from './types/user';
 import { CurrencyCode } from './utils/financialModels';
 import { NeonService } from './services/neonService';
+import { ShieldCheck, ArrowLeft, RefreshCw } from 'lucide-react';
 
 const DEFAULT_ADMIN: AppUser = {
   id: '2ea9da70-e1da-45b5-b63d-907791801107',
-  name: 'Cody Irwin (Admin)',
-  email: 'admin@propertywatch.com',
+  name: 'IsaacI (admin)',
+  email: 'isaaccirwin@gmail.com',
   role: 'admin',
   companyName: 'PropertyWatch Global Inc.',
   phone: '+1 (555) 019-2834',
@@ -52,16 +53,17 @@ export const App: React.FC = () => {
     return localStorage.getItem('propertywatch-auth') === 'true' ? DEFAULT_ADMIN : null;
   });
 
+  // Admin view mode: 'console' (dedicated admin UI) or 'preview' (previewing customer UI)
+  const [adminViewMode, setAdminViewMode] = useState<'console' | 'preview'>('console');
+  const [previewCustomerName, setPreviewCustomerName] = useState<string>('');
+
   const [properties, setProperties] = useState<Property[]>(INITIAL_PROPERTIES);
   const [loans, setLoans] = useState(INITIAL_LOANS);
   const [pipeline, setPipeline] = useState<DealPipelineItem[]>(INITIAL_PIPELINE);
   const [comps, setComps] = useState(INITIAL_COMPS);
   const [macroIndicators, setMacroIndicators] = useState<MacroIndicator[]>(MACRO_INDICATORS);
 
-  const [activeTab, setActiveTab] = useState<NavTabId>(() => {
-    return currentUser?.role === 'admin' ? 'admin' : 'overview';
-  });
-
+  const [activeTab, setActiveTab] = useState<NavTabId>('overview');
   const [selectedPropertyId, setSelectedPropertyId] = useState<string>('');
   const [currentFund, setCurrentFund] = useState<string>('Global Core Flagship Fund IV');
   const [currency, setCurrency] = useState<CurrencyCode>('USD');
@@ -81,7 +83,6 @@ export const App: React.FC = () => {
 
     const loadPropertiesFromNeon = async () => {
       try {
-        // If customer, fetch their properties. If admin, fetch all properties.
         const userId = currentUser?.role === 'admin' ? undefined : currentUser?.id;
         const neonProperties = await NeonService.getProperties(userId);
         if (neonProperties && neonProperties.length > 0) {
@@ -96,7 +97,7 @@ export const App: React.FC = () => {
     loadPropertiesFromNeon();
   }, [isAuthenticated, currentUser]);
 
-  // Set light theme on load
+  // Set theme on load
   useEffect(() => {
     const savedTheme = localStorage.getItem('propertywatch-theme') || 'light';
     document.documentElement.setAttribute('data-theme', savedTheme);
@@ -109,9 +110,7 @@ export const App: React.FC = () => {
     localStorage.setItem('propertywatch-auth', 'true');
     localStorage.setItem('propertywatch-user', JSON.stringify(user));
     if (user.role === 'admin') {
-      setActiveTab('admin');
-    } else {
-      setActiveTab('overview');
+      setAdminViewMode('console');
     }
   };
 
@@ -130,6 +129,27 @@ export const App: React.FC = () => {
     const themeStr = nextTheme ? 'dark' : 'light';
     localStorage.setItem('propertywatch-theme', themeStr);
     document.documentElement.setAttribute('data-theme', themeStr);
+  };
+
+  // Switch to customer portal preview from Admin
+  const handleSwitchToCustomerPortal = async (userId?: string) => {
+    if (userId) {
+      const userProps = await NeonService.getProperties(userId);
+      setProperties(userProps);
+      if (userProps.length > 0) {
+        setSelectedPropertyId(userProps[0].id);
+      }
+      setPreviewCustomerName('Selected Customer');
+    } else {
+      const allProps = await NeonService.getProperties();
+      setProperties(allProps);
+      if (allProps.length > 0) {
+        setSelectedPropertyId(allProps[0].id);
+      }
+      setPreviewCustomerName('Consolidated Master Portfolio');
+    }
+    setActiveTab('overview');
+    setAdminViewMode('preview');
   };
 
   // Keyboard shortcut listener for Command Palette (Cmd+K)
@@ -209,32 +229,73 @@ export const App: React.FC = () => {
     setActiveTab('asset-detail');
   };
 
-  // Admin selects a specific customer's portfolio to inspect
-  const handleSelectCustomerPortfolio = async (userId: string, userName: string) => {
-    try {
-      const userProperties = await NeonService.getProperties(userId);
-      setProperties(userProperties);
-      if (userProperties.length > 0) {
-        setSelectedPropertyId(userProperties[0].id);
-      }
-      setCurrentFund(`${userName}'s Monitored Portfolio`);
-      setActiveTab('overview');
-    } catch (err) {
-      console.error('Error switching portfolio:', err);
-    }
-  };
-
   const activeProperty = properties.find(p => p.id === selectedPropertyId) || properties[0];
   const totalAum = properties.reduce((acc, p) => acc + (p.currentValuation || 0), 0);
   const isAdmin = currentUser?.role === 'admin';
 
-  // Show login screen if not authenticated
-  if (!isAuthenticated) {
+  // 1. Show login screen if not authenticated
+  if (!isAuthenticated || !currentUser) {
     return <LoginScreen onLogin={handleLogin} />;
   }
 
+  // 2. If user is Admin and in Console mode, render the dedicated Executive Admin Console!
+  if (isAdmin && adminViewMode === 'console') {
+    return (
+      <AdminConsole
+        currentUser={currentUser}
+        onLogout={handleLogout}
+        onSwitchToCustomerPortal={handleSwitchToCustomerPortal}
+        isDark={isDark}
+        onToggleTheme={handleToggleTheme}
+      />
+    );
+  }
+
+  // 3. Otherwise render Customer Portal (or Admin Previewing Customer Portal)
   return (
     <div className="app-container">
+      {/* Floating Admin Banner when admin is previewing customer portal */}
+      {isAdmin && (
+        <div style={{
+          background: 'var(--accent-red)',
+          color: '#FFFFFF',
+          padding: '0.45rem 1.5rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          fontSize: '0.78rem',
+          fontWeight: 700,
+          boxShadow: '0 2px 8px rgba(220, 38, 38, 0.35)',
+          zIndex: 9999
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <ShieldCheck size={16} />
+            <span>ADMIN PREVIEW MODE — You are viewing the customer experience ({previewCustomerName || 'All Assets'})</span>
+          </div>
+
+          <button 
+            onClick={() => setAdminViewMode('console')}
+            style={{
+              background: '#FFFFFF',
+              color: 'var(--accent-red)',
+              border: 'none',
+              borderRadius: '6px',
+              padding: '0.25rem 0.75rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+              fontSize: '0.75rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.15)'
+            }}
+          >
+            <ArrowLeft size={13} />
+            <span>Return to Admin Console</span>
+          </button>
+        </div>
+      )}
+
       {/* Institutional Capital Header */}
       <Header
         currentFund={currentFund}
@@ -253,20 +314,15 @@ export const App: React.FC = () => {
         onLogout={handleLogout}
       />
 
-      {/* Navigation Sub-system Bar */}
+      {/* Customer Navigation Bar */}
       <Navigation
         activeTab={activeTab}
         onSelectTab={setActiveTab}
         activePropertyName={activeProperty?.name}
-        isAdmin={isAdmin}
       />
 
       {/* Main Dynamic Viewport */}
       <main className="main-view-container">
-        {activeTab === 'admin' && (
-          <AdminView onSelectCustomerPortfolio={handleSelectCustomerPortfolio} />
-        )}
-
         {activeTab === 'overview' && (
           <OverviewView
             properties={properties}
