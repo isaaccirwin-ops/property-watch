@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { LoginScreen } from './components/LoginScreen';
 import { Header } from './components/Header';
 import { Navigation, NavTabId } from './components/Navigation';
 import { CommandPalette } from './components/CommandPalette';
@@ -21,6 +22,11 @@ import { Property, Tenant, DealPipelineItem, MacroIndicator } from './types/real
 import { CurrencyCode } from './utils/financialModels';
 
 export const App: React.FC = () => {
+  // Auth state
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    return localStorage.getItem('propertywatch-auth') === 'true';
+  });
+
   const [properties, setProperties] = useState<Property[]>(INITIAL_PROPERTIES);
   const [loans, setLoans] = useState(INITIAL_LOANS);
   const [pipeline, setPipeline] = useState<DealPipelineItem[]>(INITIAL_PIPELINE);
@@ -28,18 +34,38 @@ export const App: React.FC = () => {
   const [macroIndicators, setMacroIndicators] = useState<MacroIndicator[]>(MACRO_INDICATORS);
 
   const [activeTab, setActiveTab] = useState<NavTabId>('overview');
-  const [selectedPropertyId, setSelectedPropertyId] = useState<string>(INITIAL_PROPERTIES[0].id);
+  const [selectedPropertyId, setSelectedPropertyId] = useState<string>(
+    INITIAL_PROPERTIES.length > 0 ? INITIAL_PROPERTIES[0].id : ''
+  );
   const [currentFund, setCurrentFund] = useState<string>('Global Core Flagship Fund IV');
   const [currency, setCurrency] = useState<CurrencyCode>('USD');
   const [isDark, setIsDark] = useState<boolean>(() => {
-    return localStorage.getItem('propertywatch-theme') !== 'light';
+    return localStorage.getItem('propertywatch-theme') === 'dark';
   });
-  const [isSimulating, setIsSimulating] = useState<boolean>(true);
+  const [isSimulating, setIsSimulating] = useState<boolean>(false);
 
   // Modals state
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isNewDealModalOpen, setIsNewDealModalOpen] = useState(false);
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
+
+  // Set light theme on load
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('propertywatch-theme') || 'light';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+  }, []);
+
+  // Login handler
+  const handleLogin = () => {
+    setIsAuthenticated(true);
+    localStorage.setItem('propertywatch-auth', 'true');
+  };
+
+  // Logout handler
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    localStorage.removeItem('propertywatch-auth');
+  };
 
   // Toggle Theme handler
   const handleToggleTheme = () => {
@@ -52,6 +78,8 @@ export const App: React.FC = () => {
 
   // Keyboard shortcut listener for Command Palette (Cmd+K)
   useEffect(() => {
+    if (!isAuthenticated) return;
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
@@ -60,16 +88,15 @@ export const App: React.FC = () => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [isAuthenticated]);
 
-  // Live Telemetry Simulation Engine (subtle pulse updates every 4 seconds when active)
+  // Live Telemetry Simulation Engine
   useEffect(() => {
-    if (!isSimulating) return;
+    if (!isSimulating || !isAuthenticated) return;
 
     const interval = setInterval(() => {
-      // Jiggle power consumption and telemetry slightly for realism
       setProperties(prev => prev.map(p => {
-        const deltaPower = Math.floor(Math.random() * 21) - 10; // -10 to +10 kW
+        const deltaPower = Math.floor(Math.random() * 21) - 10;
         const newPower = Math.max(100, p.telemetry.powerDrawKw + deltaPower);
         return {
           ...p,
@@ -80,7 +107,6 @@ export const App: React.FC = () => {
         };
       }));
 
-      // Occasionally tweak treasury yield
       setMacroIndicators(prev => prev.map(m => {
         if (m.ticker === 'US10Y') {
           const deltaBps = (Math.random() * 0.02 - 0.01).toFixed(2);
@@ -96,7 +122,7 @@ export const App: React.FC = () => {
     }, 4000);
 
     return () => clearInterval(interval);
-  }, [isSimulating]);
+  }, [isSimulating, isAuthenticated]);
 
   // Handle pipeline deal progression
   const handleAdvanceDeal = (dealId: string) => {
@@ -129,6 +155,11 @@ export const App: React.FC = () => {
 
   const activeProperty = properties.find(p => p.id === selectedPropertyId);
   const totalAum = properties.reduce((acc, p) => acc + p.currentValuation, 0);
+
+  // Show login screen if not authenticated
+  if (!isAuthenticated) {
+    return <LoginScreen onLogin={handleLogin} />;
+  }
 
   return (
     <div className="app-container">
