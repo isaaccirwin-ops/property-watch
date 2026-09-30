@@ -9,6 +9,7 @@ import { UnderwriterView } from './components/views/UnderwriterView';
 import { PipelineView } from './components/views/PipelineView';
 import { CapitalMarketsView } from './components/views/CapitalMarketsView';
 import { ReportingView } from './components/views/ReportingView';
+import { AdminView } from './components/views/AdminView';
 import { NewDealModal } from './components/modals/NewDealModal';
 import { TenantDetailModal } from './components/modals/TenantDetailModal';
 import { 
@@ -19,12 +20,36 @@ import {
   MACRO_INDICATORS 
 } from './data/portfolioData';
 import { Property, Tenant, DealPipelineItem, MacroIndicator } from './types/realEstate';
+import { AppUser } from './types/user';
 import { CurrencyCode } from './utils/financialModels';
+import { NeonService } from './services/neonService';
+
+const DEFAULT_ADMIN: AppUser = {
+  id: '2ea9da70-e1da-45b5-b63d-907791801107',
+  name: 'Cody Irwin (Admin)',
+  email: 'admin@propertywatch.com',
+  role: 'admin',
+  companyName: 'PropertyWatch Global Inc.',
+  phone: '+1 (555) 019-2834',
+  planTier: 'enterprise',
+  billingStatus: 'active',
+  monthlySpend: 0,
+  billingCycle: 'annual',
+  createdAt: new Date().toISOString()
+};
 
 export const App: React.FC = () => {
   // Auth state
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     return localStorage.getItem('propertywatch-auth') === 'true';
+  });
+
+  const [currentUser, setCurrentUser] = useState<AppUser | null>(() => {
+    const saved = localStorage.getItem('propertywatch-user');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) { /* ignore */ }
+    }
+    return localStorage.getItem('propertywatch-auth') === 'true' ? DEFAULT_ADMIN : null;
   });
 
   const [properties, setProperties] = useState<Property[]>(INITIAL_PROPERTIES);
@@ -33,10 +58,11 @@ export const App: React.FC = () => {
   const [comps, setComps] = useState(INITIAL_COMPS);
   const [macroIndicators, setMacroIndicators] = useState<MacroIndicator[]>(MACRO_INDICATORS);
 
-  const [activeTab, setActiveTab] = useState<NavTabId>('overview');
-  const [selectedPropertyId, setSelectedPropertyId] = useState<string>(
-    INITIAL_PROPERTIES.length > 0 ? INITIAL_PROPERTIES[0].id : ''
-  );
+  const [activeTab, setActiveTab] = useState<NavTabId>(() => {
+    return currentUser?.role === 'admin' ? 'admin' : 'overview';
+  });
+
+  const [selectedPropertyId, setSelectedPropertyId] = useState<string>('');
   const [currentFund, setCurrentFund] = useState<string>('Global Core Flagship Fund IV');
   const [currency, setCurrency] = useState<CurrencyCode>('USD');
   const [isDark, setIsDark] = useState<boolean>(() => {
@@ -49,6 +75,27 @@ export const App: React.FC = () => {
   const [isNewDealModalOpen, setIsNewDealModalOpen] = useState(false);
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
 
+  // Load properties from Neon when authenticated
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const loadPropertiesFromNeon = async () => {
+      try {
+        // If customer, fetch their properties. If admin, fetch all properties.
+        const userId = currentUser?.role === 'admin' ? undefined : currentUser?.id;
+        const neonProperties = await NeonService.getProperties(userId);
+        if (neonProperties && neonProperties.length > 0) {
+          setProperties(neonProperties);
+          setSelectedPropertyId(neonProperties[0].id);
+        }
+      } catch (err) {
+        console.warn('Could not load properties from Neon:', err);
+      }
+    };
+
+    loadPropertiesFromNeon();
+  }, [isAuthenticated, currentUser]);
+
   // Set light theme on load
   useEffect(() => {
     const savedTheme = localStorage.getItem('propertywatch-theme') || 'light';
@@ -56,15 +103,24 @@ export const App: React.FC = () => {
   }, []);
 
   // Login handler
-  const handleLogin = () => {
+  const handleLogin = (user: AppUser) => {
+    setCurrentUser(user);
     setIsAuthenticated(true);
     localStorage.setItem('propertywatch-auth', 'true');
+    localStorage.setItem('propertywatch-user', JSON.stringify(user));
+    if (user.role === 'admin') {
+      setActiveTab('admin');
+    } else {
+      setActiveTab('overview');
+    }
   };
 
   // Logout handler
   const handleLogout = () => {
     setIsAuthenticated(false);
+    setCurrentUser(null);
     localStorage.removeItem('propertywatch-auth');
+    localStorage.removeItem('propertywatch-user');
   };
 
   // Toggle Theme handler
@@ -97,7 +153,7 @@ export const App: React.FC = () => {
     const interval = setInterval(() => {
       setProperties(prev => prev.map(p => {
         const deltaPower = Math.floor(Math.random() * 21) - 10;
-        const newPower = Math.max(100, p.telemetry.powerDrawKw + deltaPower);
+        const newPower = Math.max(100, (p.telemetry?.powerDrawKw || 200) + deltaPower);
         return {
           ...p,
           telemetry: {
@@ -153,8 +209,24 @@ export const App: React.FC = () => {
     setActiveTab('asset-detail');
   };
 
-  const activeProperty = properties.find(p => p.id === selectedPropertyId);
-  const totalAum = properties.reduce((acc, p) => acc + p.currentValuation, 0);
+  // Admin selects a specific customer's portfolio to inspect
+  const handleSelectCustomerPortfolio = async (userId: string, userName: string) => {
+    try {
+      const userProperties = await NeonService.getProperties(userId);
+      setProperties(userProperties);
+      if (userProperties.length > 0) {
+        setSelectedPropertyId(userProperties[0].id);
+      }
+      setCurrentFund(`${userName}'s Monitored Portfolio`);
+      setActiveTab('overview');
+    } catch (err) {
+      console.error('Error switching portfolio:', err);
+    }
+  };
+
+  const activeProperty = properties.find(p => p.id === selectedPropertyId) || properties[0];
+  const totalAum = properties.reduce((acc, p) => acc + (p.currentValuation || 0), 0);
+  const isAdmin = currentUser?.role === 'admin';
 
   // Show login screen if not authenticated
   if (!isAuthenticated) {
@@ -177,6 +249,8 @@ export const App: React.FC = () => {
         onOpenNewDealModal={() => setIsNewDealModalOpen(true)}
         macroIndicators={macroIndicators}
         totalAum={totalAum}
+        currentUser={currentUser}
+        onLogout={handleLogout}
       />
 
       {/* Navigation Sub-system Bar */}
@@ -184,10 +258,15 @@ export const App: React.FC = () => {
         activeTab={activeTab}
         onSelectTab={setActiveTab}
         activePropertyName={activeProperty?.name}
+        isAdmin={isAdmin}
       />
 
       {/* Main Dynamic Viewport */}
       <main className="main-view-container">
+        {activeTab === 'admin' && (
+          <AdminView onSelectCustomerPortfolio={handleSelectCustomerPortfolio} />
+        )}
+
         {activeTab === 'overview' && (
           <OverviewView
             properties={properties}

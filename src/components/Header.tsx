@@ -8,11 +8,13 @@ import {
   Moon, 
   Search, 
   Plus, 
-  DollarSign,
-  ChevronDown
+  ShieldCheck,
+  User,
+  LogOut
 } from 'lucide-react';
 import { CurrencyCode, formatCurrency } from '../utils/financialModels';
 import { MacroIndicator } from '../types/realEstate';
+import { AppUser } from '../types/user';
 
 interface HeaderProps {
   currentFund: string;
@@ -27,6 +29,8 @@ interface HeaderProps {
   onOpenNewDealModal: () => void;
   macroIndicators: MacroIndicator[];
   totalAum: number;
+  currentUser?: AppUser | null;
+  onLogout?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -41,7 +45,9 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenCommandPalette,
   onOpenNewDealModal,
   macroIndicators,
-  totalAum
+  totalAum,
+  currentUser,
+  onLogout
 }) => {
   return (
     <header className="app-header">
@@ -85,13 +91,13 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <span style={{ background: 'linear-gradient(135deg, #FFFFFF, #94A3B8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                <span style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--text-primary)' }}>
                   PropertyWatch
                 </span>
-                <span className="brand-tag">ENTERPRISE</span>
+                <span className="brand-tag">INSTITUTIONAL</span>
               </div>
               <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 500, letterSpacing: '0.02em' }}>
-                Institutional Real Estate Intelligence
+                Neon Powered Real Estate OS
               </div>
             </div>
           </div>
@@ -115,16 +121,16 @@ export const Header: React.FC<HeaderProps> = ({
                   outline: 'none'
                 }}
               >
-                <option value="Global Core Flagship Fund IV" style={{ background: '#0E131F', color: '#FFF' }}>
+                <option value="Global Core Flagship Fund IV">
                   Global Core Flagship IV ({formatCurrency(totalAum, currency, true)})
                 </option>
-                <option value="US Opportunistic Logistics Fund II" style={{ background: '#0E131F', color: '#FFF' }}>
+                <option value="US Opportunistic Logistics Fund II">
                   US Logistics Fund II ($1.25B)
                 </option>
-                <option value="European Life Science & Tech Fund I" style={{ background: '#0E131F', color: '#FFF' }}>
+                <option value="European Life Science & Tech Fund I">
                   European Tech & Lab Fund (€850M)
                 </option>
-                <option value="All Monitored Assets" style={{ background: '#0E131F', color: '#FFF' }}>
+                <option value="All Monitored Assets">
                   Consolidated Master Portfolio
                 </option>
               </select>
@@ -152,8 +158,8 @@ export const Header: React.FC<HeaderProps> = ({
                 key={cur}
                 onClick={() => onChangeCurrency(cur)}
                 style={{
-                  background: currency === cur ? 'rgba(56, 189, 248, 0.2)' : 'transparent',
-                  color: currency === cur ? 'var(--accent-cyan)' : 'var(--text-muted)',
+                  background: currency === cur ? 'var(--accent-red)' : 'transparent',
+                  color: currency === cur ? '#FFF' : 'var(--text-muted)',
                   border: 'none',
                   borderRadius: '4px',
                   padding: '0.25rem 0.5rem',
@@ -176,6 +182,58 @@ export const Header: React.FC<HeaderProps> = ({
           >
             {isDark ? <Sun size={16} /> : <Moon size={16} />}
           </button>
+
+          {/* User Account Info */}
+          {currentUser && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              padding: '0.25rem 0.6rem',
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border-subtle)',
+              borderRadius: 'var(--radius-md)'
+            }}>
+              <div style={{
+                width: '26px',
+                height: '26px',
+                borderRadius: '50%',
+                background: currentUser.role === 'admin' ? 'rgba(220, 38, 38, 0.15)' : 'rgba(59, 130, 246, 0.15)',
+                color: currentUser.role === 'admin' ? 'var(--accent-red)' : '#2563EB',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                {currentUser.role === 'admin' ? <ShieldCheck size={14} /> : <User size={14} />}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                <span style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.1 }}>
+                  {currentUser.name}
+                </span>
+                <span style={{ fontSize: '0.62rem', color: currentUser.role === 'admin' ? 'var(--accent-red)' : 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>
+                  {currentUser.role}
+                </span>
+              </div>
+              {onLogout && (
+                <button
+                  onClick={onLogout}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--text-muted)',
+                    cursor: 'pointer',
+                    padding: '2px',
+                    marginLeft: '4px',
+                    display: 'flex',
+                    alignItems: 'center'
+                  }}
+                  title="Sign out"
+                >
+                  <LogOut size={13} />
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Primary Action: Underwrite Deal */}
           <button onClick={onOpenNewDealModal} className="btn btn-primary">
