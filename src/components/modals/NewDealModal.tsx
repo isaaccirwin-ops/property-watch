@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Building2, DollarSign, Percent, MapPin, Sparkles, Check } from 'lucide-react';
+import { X, Building2, DollarSign, Percent, MapPin, Check } from 'lucide-react';
 import { AssetClass, DealPipelineItem } from '../../types/realEstate';
 import { CurrencyCode } from '../../utils/financialModels';
 

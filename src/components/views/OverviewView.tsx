@@ -33,23 +33,23 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   const [viewMode, setViewMode] = useState<'grid' | 'map' | 'table'>('grid');
 
   // Aggregated KPIs
-  const totalValuation = properties.reduce((acc, p) => acc + p.currentValuation, 0);
-  const totalNoi = properties.reduce((acc, p) => acc + p.netOperatingIncome, 0);
-  const totalSqFt = properties.reduce((acc, p) => acc + p.rentableSqFt, 0);
-  const avgCapRate = properties.reduce((acc, p) => acc + (p.capRate * p.currentValuation), 0) / totalValuation;
-  const avgOccupancy = properties.reduce((acc, p) => acc + (p.physicalOccupancy * p.rentableSqFt), 0) / totalSqFt;
-  const avgWalt = properties.reduce((acc, p) => acc + (p.waltYears * p.currentValuation), 0) / totalValuation;
-  const totalDebt = properties.reduce((acc, p) => acc + p.debtBalance, 0);
-  const portfolioLtv = (totalDebt / totalValuation) * 100;
-  const avgDscr = properties.reduce((acc, p) => acc + (p.debtServiceCoverageRatio * p.debtBalance), 0) / totalDebt;
-  const avgGresb = Math.round(properties.reduce((acc, p) => acc + p.gresbScore, 0) / properties.length);
+  const totalValuation = properties.reduce((acc, p) => acc + (p.currentValuation || 0), 0);
+  const totalNoi = properties.reduce((acc, p) => acc + (p.netOperatingIncome || 0), 0);
+  const totalSqFt = properties.reduce((acc, p) => acc + (p.rentableSqFt || 0), 0);
+  const avgCapRate = totalValuation > 0 ? properties.reduce((acc, p) => acc + ((p.capRate || 0) * (p.currentValuation || 0)), 0) / totalValuation : 0;
+  const avgOccupancy = totalSqFt > 0 ? properties.reduce((acc, p) => acc + ((p.physicalOccupancy || 0) * (p.rentableSqFt || 0)), 0) / totalSqFt : 0;
+  const avgWalt = totalValuation > 0 ? properties.reduce((acc, p) => acc + ((p.waltYears || 0) * (p.currentValuation || 0)), 0) / totalValuation : 0;
+  const totalDebt = properties.reduce((acc, p) => acc + (p.debtBalance || 0), 0);
+  const portfolioLtv = totalValuation > 0 ? (totalDebt / totalValuation) * 100 : 0;
+  const avgDscr = totalDebt > 0 ? properties.reduce((acc, p) => acc + ((p.debtServiceCoverageRatio || 0) * (p.debtBalance || 0)), 0) / totalDebt : 0;
+  const avgGresb = properties.length > 0 ? Math.round(properties.reduce((acc, p) => acc + (p.gresbScore || 0), 0) / properties.length) : 0;
 
   // Asset Class Breakdown
   const assetClasses: AssetClass[] = ['Commercial Office', 'Industrial Logistics', 'Multifamily Luxury', 'Life Sciences'];
   const breakdown = assetClasses.map(cls => {
     const matching = properties.filter(p => p.assetClass === cls);
-    const value = matching.reduce((acc, p) => acc + p.currentValuation, 0);
-    const pct = (value / totalValuation) * 100;
+    const value = matching.reduce((acc, p) => acc + (p.currentValuation || 0), 0);
+    const pct = totalValuation > 0 ? (value / totalValuation) * 100 : 0;
     return {
       class: cls,
       value,

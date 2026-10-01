@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { AppUser } from '../types/user';
 import { NeonService } from '../services/neonService';
-import { ShieldCheck, User, Database, AlertCircle, ArrowRight } from 'lucide-react';
+import { Database, AlertCircle, ArrowRight, Lock, Mail, Building2 } from 'lucide-react';
 
 interface LoginScreenProps {
   onLogin: (user: AppUser) => void;
@@ -19,7 +19,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
     setError('');
 
     if (!email.trim()) {
-      setError('Please enter your email address.');
+      setError('Please enter your corporate email address.');
       return;
     }
 
@@ -32,35 +32,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
       if (authResult.success && authResult.user) {
         onLogin(authResult.user);
       } else {
-        setError(authResult.message || 'Login failed. Please check your credentials.');
+        setError(authResult.message || 'Authentication failed. Please verify your credentials.');
       }
-    } catch (err: any) {
+    } catch {
       setIsLoading(false);
-      setError('Connection to database timed out. Please try again.');
-    }
-  };
-
-  const handleQuickAdminLogin = async () => {
-    setIsLoading(true);
-    setError('');
-    setEmail('isaaccirwin@gmail.com');
-    setPassword('12345');
-    const authResult = await NeonService.authenticate('isaaccirwin@gmail.com', '12345');
-    setIsLoading(false);
-    if (authResult.success && authResult.user) {
-      onLogin(authResult.user);
-    }
-  };
-
-  const handleQuickCustomerLogin = async () => {
-    setIsLoading(true);
-    setError('');
-    setEmail('sarah.jenkins@blackrockre.com');
-    setPassword('client123');
-    const authResult = await NeonService.authenticate('sarah.jenkins@blackrockre.com', 'client123');
-    setIsLoading(false);
-    if (authResult.success && authResult.user) {
-      onLogin(authResult.user);
+      setError('Connection to Neon database timed out. Please try again.');
     }
   };
 
@@ -68,104 +44,74 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
     <div className="login-screen">
       <div className="login-container">
         <div className="login-card">
-          {/* Brand */}
+          {/* Brand Header */}
           <div className="login-brand">
             <div className="login-brand-icon">
-              <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
-                <path d="M6 24V14L16 6L26 14V24H19V17H13V24H6Z" fill="currentColor"/>
-                <circle cx="16" cy="12" r="2" fill="rgba(255,255,255,0.6)"/>
-              </svg>
+              <Building2 size={24} />
             </div>
             <span className="login-brand-name">PropertyWatch</span>
             <span className="login-brand-tagline">Institutional Real Estate Operating System</span>
           </div>
 
-          {/* Database Connection Status */}
+          {/* Secure Neon Status */}
           <div style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             gap: '6px',
-            marginBottom: '1rem',
+            marginBottom: '1.25rem',
             fontSize: '0.72rem',
             color: '#16A34A',
             fontWeight: 600
           }}>
             <Database size={12} />
-            <span>Connected to Neon Postgres</span>
+            <span>Neon Lakebase Postgres Active</span>
             <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#16A34A' }}></span>
           </div>
 
-          {/* Quick Demo Login Switcher */}
-          <div style={{
-            background: 'var(--bg-input)',
-            borderRadius: 'var(--radius-md)',
-            padding: '0.75rem',
-            marginBottom: '1.25rem',
-            border: '1px solid var(--border-subtle)'
-          }}>
-            <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.5rem', textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              ⚡ 1-Click Instant Sign-In
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-              <button
-                type="button"
-                onClick={handleQuickAdminLogin}
-                className="btn btn-sm btn-primary"
-                style={{ fontSize: '0.74rem', padding: '0.45rem 0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}
-                disabled={isLoading}
-              >
-                <ShieldCheck size={14} />
-                <span>Admin (IsaacI)</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleQuickCustomerLogin}
-                className="btn btn-sm btn-secondary"
-                style={{ fontSize: '0.74rem', padding: '0.45rem 0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}
-                disabled={isLoading}
-              >
-                <User size={14} />
-                <span>Client (Blackstone)</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Error message */}
+          {/* Error Message */}
           {error && (
-            <div className="login-error" style={{ marginBottom: '1rem' }}>
+            <div className="login-error" style={{ marginBottom: '1.25rem' }}>
               <AlertCircle size={15} style={{ flexShrink: 0 }} />
               <span>{error}</span>
             </div>
           )}
 
-          {/* Login form */}
+          {/* Login Form */}
           <form className="login-form" onSubmit={handleSubmit}>
             <div className="login-field">
-              <label className="login-label" htmlFor="login-email">Email Address</label>
-              <input
-                id="login-email"
-                className="login-input"
-                type="email"
-                placeholder="isaaccirwin@gmail.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                autoComplete="email"
-                autoFocus
-              />
+              <label className="login-label" htmlFor="login-email">Corporate Email</label>
+              <div style={{ position: 'relative' }}>
+                <Mail size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                <input
+                  id="login-email"
+                  className="login-input"
+                  style={{ paddingLeft: '36px' }}
+                  type="email"
+                  placeholder="name@company.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  autoComplete="email"
+                  autoFocus
+                />
+              </div>
             </div>
 
             <div className="login-field">
               <label className="login-label" htmlFor="login-password">Password</label>
-              <input
-                id="login-password"
-                className="login-input"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete="current-password"
-              />
+              <div style={{ position: 'relative' }}>
+                <Lock size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                <input
+                  id="login-password"
+                  className="login-input"
+                  style={{ paddingLeft: '36px' }}
+                  type="password"
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="current-password"
+                />
+              </div>
             </div>
 
             <div className="login-options">
@@ -175,31 +121,34 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                   checked={remember}
                   onChange={(e) => setRemember(e.target.checked)}
                 />
-                Remember me
+                Remember this workstation
               </label>
               <a href="#" className="login-forgot" onClick={(e) => e.preventDefault()}>
-                Forgot password?
+                Forgot credentials?
               </a>
             </div>
 
             <button
               type="submit"
-              className="login-submit"
+              className="login-submit-btn"
               disabled={isLoading}
             >
               {isLoading ? (
-                'Verifying with Neon...'
+                <span className="login-spinner" />
               ) : (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                <>
                   <span>Sign In</span>
-                  <ArrowRight size={14} />
-                </span>
+                  <ArrowRight size={16} />
+                </>
               )}
             </button>
           </form>
 
-          <div className="login-footer" style={{ marginTop: '1.25rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-            Admin Credentials: <code>isaaccirwin@gmail.com</code> / <code>12345</code>
+          {/* Institutional SSO & Security Note */}
+          <div className="login-footer">
+            <p className="login-footer-text">
+              Protected by Enterprise Multi-Tenant RBAC & Neon SSL.
+            </p>
           </div>
         </div>
       </div>

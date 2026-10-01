@@ -38,14 +38,24 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
 }) => {
   const property = properties.find(p => p.id === selectedPropertyId) || properties[0];
   const [activeTab, setActiveTab] = useState<'stacking' | 'rentroll' | 'telemetry' | 'capex'>('stacking');
-  const [selectedFloorUnit, setSelectedFloorUnit] = useState<StackingUnit | null>(property.stackingPlan[0] || null);
+  const [selectedFloorUnit, setSelectedFloorUnit] = useState<StackingUnit | null>(property?.stackingPlan?.[0] || null);
+
+  if (!property) {
+    return (
+      <div className="card" style={{ padding: '3rem', textAlign: 'center' }}>
+        <Building size={36} color="var(--text-muted)" style={{ margin: '0 auto 1rem' }} />
+        <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>No Property Available</h3>
+        <p style={{ color: 'var(--text-muted)' }}>No commercial assets found. Select an asset from the portfolio command center.</p>
+      </div>
+    );
+  }
 
   // Rollover analysis (grouping tenant sqft expiry by year)
   const expirationTimeline = [2026, 2027, 2028, 2029, 2030, 2031, 2032, 2033, 2034, 2035, 2036];
   const rolloverData = expirationTimeline.map(year => {
-    const expiredTenants = property.tenants.filter(t => new Date(t.leaseExpiryDate).getFullYear() === year);
-    const expiringSqFt = expiredTenants.reduce((acc, t) => acc + t.leasedSqFt, 0);
-    const pct = property.rentableSqFt > 0 ? (expiringSqFt / property.rentableSqFt) * 100 : 0;
+    const expiredTenants = (property.tenants || []).filter(t => new Date(t.leaseExpiryDate).getFullYear() === year);
+    const expiringSqFt = expiredTenants.reduce((acc, t) => acc + (t.leasedSqFt || 0), 0);
+    const pct = (property.rentableSqFt || 0) > 0 ? (expiringSqFt / property.rentableSqFt) * 100 : 0;
     return { year, expiringSqFt, pct, count: expiredTenants.length };
   });
 
@@ -472,7 +482,7 @@ export const AssetDetailView: React.FC<AssetDetailViewProps> = ({
                   {property.telemetry.hvacEfficiencyPct}%
                 </div>
                 <div style={{ fontSize: '0.72rem', color: 'var(--accent-emerald)', marginTop: '0.25rem' }}>
-                  AI Variable Frequency Drive Optimized
+                  Variable Frequency Drive Automated Balancing
                 </div>
               </div>
 

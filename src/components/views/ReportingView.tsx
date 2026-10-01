@@ -30,7 +30,7 @@ export const ReportingView: React.FC<ReportingViewProps> = ({
   const netAssetValue = totalValuation - totalDebt;
   const totalNoi = properties.reduce((acc, p) => acc + p.netOperatingIncome, 0);
   const totalSqFt = properties.reduce((acc, p) => acc + p.rentableSqFt, 0);
-  const avgOccupancy = properties.reduce((acc, p) => acc + (p.physicalOccupancy * p.rentableSqFt), 0) / totalSqFt;
+  const avgOccupancy = totalSqFt > 0 ? properties.reduce((acc, p) => acc + (p.physicalOccupancy * p.rentableSqFt), 0) / totalSqFt : 0;
 
   const handlePrint = () => {
     window.print();

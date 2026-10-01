@@ -31,7 +31,7 @@ export const CapitalMarketsView: React.FC<CapitalMarketsViewProps> = ({
   const blendedLtv = totalValuation > 0 ? (totalDebt / totalValuation) * 100 : 0;
   
   // Wtd average interest rate
-  const wtdInterestRate = loans.reduce((acc, l) => acc + (l.interestRatePct * l.currentBalance), 0) / totalDebt;
+  const wtdInterestRate = totalDebt > 0 ? loans.reduce((acc, l) => acc + (l.interestRatePct * l.currentBalance), 0) / totalDebt : 0;
 
   // Maturity schedule (wall)
   const maturitySchedule = [

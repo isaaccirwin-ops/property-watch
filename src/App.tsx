@@ -9,7 +9,7 @@ import { UnderwriterView } from './components/views/UnderwriterView';
 import { PipelineView } from './components/views/PipelineView';
 import { CapitalMarketsView } from './components/views/CapitalMarketsView';
 import { ReportingView } from './components/views/ReportingView';
-import { AdminConsole } from './components/views/AdminConsole';
+import { AdminView } from './components/views/AdminView';
 import { NewDealModal } from './components/modals/NewDealModal';
 import { TenantDetailModal } from './components/modals/TenantDetailModal';
 import { 
@@ -23,7 +23,6 @@ import { Property, Tenant, DealPipelineItem, MacroIndicator } from './types/real
 import { AppUser } from './types/user';
 import { CurrencyCode } from './utils/financialModels';
 import { NeonService } from './services/neonService';
-import { ShieldCheck, ArrowLeft, RefreshCw } from 'lucide-react';
 
 const DEFAULT_ADMIN: AppUser = {
   id: '2ea9da70-e1da-45b5-b63d-907791801107',
@@ -53,10 +52,6 @@ export const App: React.FC = () => {
     return localStorage.getItem('propertywatch-auth') === 'true' ? DEFAULT_ADMIN : null;
   });
 
-  // Admin view mode: 'console' (dedicated admin UI) or 'preview' (previewing customer UI)
-  const [adminViewMode, setAdminViewMode] = useState<'console' | 'preview'>('console');
-  const [previewCustomerName, setPreviewCustomerName] = useState<string>('');
-
   const [properties, setProperties] = useState<Property[]>(INITIAL_PROPERTIES);
   const [loans, setLoans] = useState(INITIAL_LOANS);
   const [pipeline, setPipeline] = useState<DealPipelineItem[]>(INITIAL_PIPELINE);
@@ -64,7 +59,7 @@ export const App: React.FC = () => {
   const [macroIndicators, setMacroIndicators] = useState<MacroIndicator[]>(MACRO_INDICATORS);
 
   const [activeTab, setActiveTab] = useState<NavTabId>('overview');
-  const [selectedPropertyId, setSelectedPropertyId] = useState<string>('');
+  const [selectedPropertyId, setSelectedPropertyId] = useState<string>(() => INITIAL_PROPERTIES[0]?.id || '');
   const [currentFund, setCurrentFund] = useState<string>('Global Core Flagship Fund IV');
   const [currency, setCurrency] = useState<CurrencyCode>('USD');
   const [isDark, setIsDark] = useState<boolean>(() => {
@@ -77,24 +72,34 @@ export const App: React.FC = () => {
   const [isNewDealModalOpen, setIsNewDealModalOpen] = useState(false);
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
 
-  // Load properties from Neon when authenticated
+  // Load all live data from Neon when authenticated
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    const loadPropertiesFromNeon = async () => {
+    const loadDataFromNeon = async () => {
       try {
         const userId = currentUser?.role === 'admin' ? undefined : currentUser?.id;
-        const neonProperties = await NeonService.getProperties(userId);
-        if (neonProperties && neonProperties.length > 0) {
-          setProperties(neonProperties);
-          setSelectedPropertyId(neonProperties[0].id);
+        const [neonProps, neonLoans, neonDeals] = await Promise.all([
+          NeonService.getProperties(userId),
+          NeonService.getLoans(),
+          NeonService.getPipelineDeals()
+        ]);
+        if (neonProps && neonProps.length > 0) {
+          setProperties(neonProps);
+          setSelectedPropertyId(prev => prev || neonProps[0].id);
+        }
+        if (neonLoans && neonLoans.length > 0) {
+          setLoans(neonLoans);
+        }
+        if (neonDeals && neonDeals.length > 0) {
+          setPipeline(neonDeals);
         }
       } catch (err) {
-        console.warn('Could not load properties from Neon:', err);
+        console.warn('Could not load data from Neon, using baseline:', err);
       }
     };
 
-    loadPropertiesFromNeon();
+    loadDataFromNeon();
   }, [isAuthenticated, currentUser]);
 
   // Set theme on load
@@ -109,9 +114,7 @@ export const App: React.FC = () => {
     setIsAuthenticated(true);
     localStorage.setItem('propertywatch-auth', 'true');
     localStorage.setItem('propertywatch-user', JSON.stringify(user));
-    if (user.role === 'admin') {
-      setAdminViewMode('console');
-    }
+    setActiveTab('overview');
   };
 
   // Logout handler
@@ -131,27 +134,6 @@ export const App: React.FC = () => {
     document.documentElement.setAttribute('data-theme', themeStr);
   };
 
-  // Switch to customer portal preview from Admin
-  const handleSwitchToCustomerPortal = async (userId?: string) => {
-    if (userId) {
-      const userProps = await NeonService.getProperties(userId);
-      setProperties(userProps);
-      if (userProps.length > 0) {
-        setSelectedPropertyId(userProps[0].id);
-      }
-      setPreviewCustomerName('Selected Customer');
-    } else {
-      const allProps = await NeonService.getProperties();
-      setProperties(allProps);
-      if (allProps.length > 0) {
-        setSelectedPropertyId(allProps[0].id);
-      }
-      setPreviewCustomerName('Consolidated Master Portfolio');
-    }
-    setActiveTab('overview');
-    setAdminViewMode('preview');
-  };
-
   // Keyboard shortcut listener for Command Palette (Cmd+K)
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -166,13 +148,13 @@ export const App: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isAuthenticated]);
 
-  // Live Telemetry Simulation Engine
+  // Telemetry updates when live
   useEffect(() => {
     if (!isSimulating || !isAuthenticated) return;
 
     const interval = setInterval(() => {
       setProperties(prev => prev.map(p => {
-        const deltaPower = Math.floor(Math.random() * 21) - 10;
+        const deltaPower = Math.floor(Math.random() * 11) - 5;
         const newPower = Math.max(100, (p.telemetry?.powerDrawKw || 200) + deltaPower);
         return {
           ...p,
@@ -182,44 +164,41 @@ export const App: React.FC = () => {
           }
         };
       }));
-
-      setMacroIndicators(prev => prev.map(m => {
-        if (m.ticker === 'US10Y') {
-          const deltaBps = (Math.random() * 0.02 - 0.01).toFixed(2);
-          const currentVal = parseFloat(m.value);
-          const nextVal = (currentVal + parseFloat(deltaBps)).toFixed(2);
-          return {
-            ...m,
-            value: `${nextVal}%`
-          };
-        }
-        return m;
-      }));
-    }, 4000);
+    }, 5000);
 
     return () => clearInterval(interval);
   }, [isSimulating, isAuthenticated]);
 
-  // Handle pipeline deal progression
-  const handleAdvanceDeal = (dealId: string) => {
+  // Handle pipeline deal progression - writes directly to Neon
+  const handleAdvanceDeal = async (dealId: string) => {
     const stageOrder: DealPipelineItem['stage'][] = [
       'Sourced', 'Underwriting', 'LOI Submitted', 'Due Diligence', 'IC Approval', 'Closed'
     ];
 
-    setPipeline(prev => prev.map(deal => {
-      if (deal.id === dealId) {
-        const currentIndex = stageOrder.indexOf(deal.stage);
-        if (currentIndex < stageOrder.length - 1) {
-          return { ...deal, stage: stageOrder[currentIndex + 1] };
-        }
-      }
-      return deal;
-    }));
+    const currentDeal = pipeline.find(d => d.id === dealId);
+    if (!currentDeal) return;
+    const currentIndex = stageOrder.indexOf(currentDeal.stage);
+    if (currentIndex >= stageOrder.length - 1) return;
+    const nextStage = stageOrder[currentIndex + 1];
+
+    setPipeline(prev => prev.map(deal => deal.id === dealId ? { ...deal, stage: nextStage } : deal));
+
+    try {
+      await NeonService.updateDealStage(dealId, nextStage);
+    } catch (err) {
+      console.error('Error updating deal stage in Neon:', err);
+    }
   };
 
-  // Handle add new deal from modal
-  const handleAddDeal = (newDeal: DealPipelineItem) => {
-    setPipeline(prev => [newDeal, ...prev]);
+  // Handle add new deal from modal - writes directly to Neon
+  const handleAddDeal = async (newDeal: DealPipelineItem) => {
+    try {
+      const created = await NeonService.createDeal(newDeal);
+      setPipeline(prev => [created, ...prev.filter(d => d.id !== created.id)]);
+    } catch (err) {
+      console.error('Error saving deal to Neon:', err);
+      setPipeline(prev => [newDeal, ...prev]);
+    }
     setActiveTab('pipeline');
   };
 
@@ -227,6 +206,21 @@ export const App: React.FC = () => {
   const handleSelectProperty = (id: string) => {
     setSelectedPropertyId(id);
     setActiveTab('asset-detail');
+  };
+
+  // Admin selects a specific customer's portfolio to inspect
+  const handleSelectCustomerPortfolio = async (userId: string, userName: string) => {
+    try {
+      const userProperties = await NeonService.getProperties(userId);
+      if (userProperties && userProperties.length > 0) {
+        setProperties(userProperties);
+        setSelectedPropertyId(userProperties[0].id);
+        setCurrentFund(`${userName}'s Monitored Portfolio`);
+      }
+      setActiveTab('overview');
+    } catch (err) {
+      console.error('Error switching portfolio:', err);
+    }
   };
 
   const activeProperty = properties.find(p => p.id === selectedPropertyId) || properties[0];
@@ -238,64 +232,9 @@ export const App: React.FC = () => {
     return <LoginScreen onLogin={handleLogin} />;
   }
 
-  // 2. If user is Admin and in Console mode, render the dedicated Executive Admin Console!
-  if (isAdmin && adminViewMode === 'console') {
-    return (
-      <AdminConsole
-        currentUser={currentUser}
-        onLogout={handleLogout}
-        onSwitchToCustomerPortal={handleSwitchToCustomerPortal}
-        isDark={isDark}
-        onToggleTheme={handleToggleTheme}
-      />
-    );
-  }
-
-  // 3. Otherwise render Customer Portal (or Admin Previewing Customer Portal)
+  // 2. Render Full Institutional Real Estate Operating System with all windows
   return (
     <div className="app-container">
-      {/* Floating Admin Banner when admin is previewing customer portal */}
-      {isAdmin && (
-        <div style={{
-          background: 'var(--accent-red)',
-          color: '#FFFFFF',
-          padding: '0.45rem 1.5rem',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          fontSize: '0.78rem',
-          fontWeight: 700,
-          boxShadow: '0 2px 8px rgba(220, 38, 38, 0.35)',
-          zIndex: 9999
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <ShieldCheck size={16} />
-            <span>ADMIN PREVIEW MODE — You are viewing the customer experience ({previewCustomerName || 'All Assets'})</span>
-          </div>
-
-          <button 
-            onClick={() => setAdminViewMode('console')}
-            style={{
-              background: '#FFFFFF',
-              color: 'var(--accent-red)',
-              border: 'none',
-              borderRadius: '6px',
-              padding: '0.25rem 0.75rem',
-              fontWeight: 800,
-              cursor: 'pointer',
-              fontSize: '0.75rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.15)'
-            }}
-          >
-            <ArrowLeft size={13} />
-            <span>Return to Admin Console</span>
-          </button>
-        </div>
-      )}
-
       {/* Institutional Capital Header */}
       <Header
         currentFund={currentFund}
@@ -314,11 +253,12 @@ export const App: React.FC = () => {
         onLogout={handleLogout}
       />
 
-      {/* Customer Navigation Bar */}
+      {/* Main Navigation Bar - All Windows Accessible */}
       <Navigation
         activeTab={activeTab}
         onSelectTab={setActiveTab}
         activePropertyName={activeProperty?.name}
+        isAdmin={isAdmin}
       />
 
       {/* Main Dynamic Viewport */}
@@ -369,6 +309,17 @@ export const App: React.FC = () => {
             properties={properties}
             loans={loans}
             currency={currency}
+          />
+        )}
+
+        {activeTab === 'admin' && (
+          <AdminView
+            onSelectCustomerPortfolio={handleSelectCustomerPortfolio}
+            properties={properties}
+            onPropertyAdded={(newProp) => {
+              setProperties(prev => [newProp, ...prev]);
+              setSelectedPropertyId(newProp.id);
+            }}
           />
         )}
       </main>

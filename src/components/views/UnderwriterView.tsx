@@ -7,7 +7,7 @@ import {
   PieChart, 
   ArrowRight, 
   RotateCcw, 
-  Sparkles, 
+  Award, 
   DollarSign, 
   Percent,
   Download
@@ -138,7 +138,7 @@ export const UnderwriterView: React.FC<UnderwriterViewProps> = ({ currency }) =>
         </div>
 
         <div className="glass-panel kpi-card">
-          <div className="kpi-header"><span className="kpi-title">GP Total Promote</span><Sparkles size={15} style={{ color: '#F59E0B' }} /></div>
+          <div className="kpi-header"><span className="kpi-title">GP Total Promote</span><Award size={15} style={{ color: '#F59E0B' }} /></div>
           <div className="kpi-value" style={{ color: '#F59E0B' }}>{formatCurrency(results.waterfall.totalGpPromote, currency, true)}</div>
           <div className="kpi-footer"><span>GP IRR: {results.waterfall.gpIrr}% vs LP: {results.waterfall.lpIrr}%</span></div>
         </div>

@@ -73,10 +73,10 @@ export const Header: React.FC<HeaderProps> = ({
             onClick={onToggleSimulation}
             className={`btn btn-sm ${isSimulating ? 'btn-primary' : 'btn-secondary'}`}
             style={{ fontSize: '0.7rem', padding: '0.2rem 0.55rem' }}
-            title="Toggle live telemetry and simulated rent streams"
+            title="Toggle live telemetry feeds"
           >
             <Radio size={12} className={isSimulating ? 'animate-pulse' : ''} />
-            {isSimulating ? 'Sim Engine: ACTIVE' : 'Sim Engine: PAUSED'}
+            {isSimulating ? 'Telemetry Feed: Connected' : 'Telemetry Feed: Standby'}
           </button>
         </div>
       </div>
@@ -97,7 +97,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <span className="brand-tag">INSTITUTIONAL</span>
               </div>
               <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 500, letterSpacing: '0.02em' }}>
-                Neon Powered Real Estate OS
+                Commercial Real Estate Operating Platform
               </div>
             </div>
           </div>

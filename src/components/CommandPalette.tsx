@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Building, Calculator, FileText, ArrowRight, X, Sparkles, Sliders } from 'lucide-react';
+import { Search, Building, Calculator, FileText, ArrowRight, X, GitPullRequest, Sliders } from 'lucide-react';
 import { Property } from '../types/realEstate';
 import { NavTabId } from './Navigation';
 import { CurrencyCode, formatCurrency } from '../utils/financialModels';
@@ -52,7 +52,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   const quickActions = [
     { label: 'Run 10-Year Pro-Forma Underwriting Model', tab: 'underwriter' as NavTabId, icon: Calculator },
     { label: 'Inspect Capital Markets & Loan Maturity Wall', tab: 'capital-markets' as NavTabId, icon: Sliders },
-    { label: 'View Sourcing Pipeline & AVM Comps', tab: 'pipeline' as NavTabId, icon: Sparkles },
+    { label: 'View Sourcing Pipeline & AVM Comps', tab: 'pipeline' as NavTabId, icon: GitPullRequest },
     { label: 'Generate Institutional LP Quarterly Tear Sheet', tab: 'reporting' as NavTabId, icon: FileText }
   ].filter(a => a.label.toLowerCase().includes(query.toLowerCase()));
 

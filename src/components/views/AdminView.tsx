@@ -18,22 +18,31 @@ import {
   Database
 } from 'lucide-react';
 import { AppUser, BillingInvoice, PlanTier, BillingStatus } from '../../types/user';
+import { Property } from '../../types/realEstate';
 import { NeonService } from '../../services/neonService';
 
 interface AdminViewProps {
   onSelectCustomerPortfolio?: (userId: string, userName: string) => void;
+  properties?: Property[];
+  onPropertyAdded?: (newProp: Property) => void;
 }
 
-export const AdminView: React.FC<AdminViewProps> = ({ onSelectCustomerPortfolio }) => {
+export const AdminView: React.FC<AdminViewProps> = ({ 
+  onSelectCustomerPortfolio,
+  properties = [],
+  onPropertyAdded
+}) => {
   const [users, setUsers] = useState<AppUser[]>([]);
   const [invoices, setInvoices] = useState<BillingInvoice[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeSubTab, setActiveSubTab] = useState<'customers' | 'billing' | 'neon-schema'>('customers');
+  const [activeSubTab, setActiveSubTab] = useState<'customers' | 'billing' | 'properties' | 'neon-schema'>('customers');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
   // Modals state
   const [isAddCustomerOpen, setIsAddCustomerOpen] = useState(false);
+  const [isAddPropertyOpen, setIsAddPropertyOpen] = useState(false);
+  const [isAddInvoiceOpen, setIsAddInvoiceOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<AppUser | null>(null);
 
   // New Customer Form State
@@ -42,6 +51,22 @@ export const AdminView: React.FC<AdminViewProps> = ({ onSelectCustomerPortfolio 
   const [newCompany, setNewCompany] = useState('');
   const [newPhone, setNewPhone] = useState('');
   const [newPlan, setNewPlan] = useState<PlanTier>('pro');
+
+  // New Property Form State
+  const [propName, setPropName] = useState('');
+  const [propCity, setPropCity] = useState('');
+  const [propState, setPropState] = useState('');
+  const [propAssetClass, setPropAssetClass] = useState('Commercial Office');
+  const [propValuation, setPropValuation] = useState<number>(45000000);
+  const [propNoi, setPropNoi] = useState<number>(2700000);
+  const [propCapRate, setPropCapRate] = useState<number>(6.0);
+  const [propUserId, setPropUserId] = useState<string>('');
+
+  // New Invoice Form State
+  const [invUserId, setInvUserId] = useState<string>('');
+  const [invNumber, setInvNumber] = useState(`INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`);
+  const [invAmount, setInvAmount] = useState<number>(1499);
+  const [invDueDate, setInvDueDate] = useState<string>(new Date(Date.now() + 15 * 86400000).toISOString().split('T')[0]);
 
   // Load data from Neon
   const loadData = async () => {
@@ -53,6 +78,10 @@ export const AdminView: React.FC<AdminViewProps> = ({ onSelectCustomerPortfolio 
       ]);
       setUsers(fetchedUsers);
       setInvoices(fetchedInvoices);
+      if (fetchedUsers.length > 0 && !propUserId) {
+        setPropUserId(fetchedUsers[0].id);
+        setInvUserId(fetchedUsers[0].id);
+      }
     } catch (err) {
       console.error('Error loading Neon data:', err);
     } finally {
@@ -128,6 +157,62 @@ export const AdminView: React.FC<AdminViewProps> = ({ onSelectCustomerPortfolio 
     const nextStatus = currentStatus === 'paid' ? 'past_due' : 'paid';
     await NeonService.updateInvoiceStatus(invoiceId, nextStatus);
     setInvoices(prev => prev.map(inv => inv.id === invoiceId ? { ...inv, status: nextStatus, paidAt: nextStatus === 'paid' ? new Date().toISOString() : undefined } : inv));
+  };
+
+  // Handle Add Property to Neon
+  const handleAddPropertySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!propName || !propCity) return;
+
+    try {
+      const created = await NeonService.createProperty({
+        name: propName,
+        city: propCity,
+        state: propState || 'NY',
+        assetClass: propAssetClass as any,
+        currentValuation: propValuation,
+        netOperatingIncome: propNoi,
+        capRate: propCapRate,
+        acquisitionPrice: Math.round(propValuation * 0.9),
+        debtBalance: Math.round(propValuation * 0.5),
+        rentableSqFt: Math.round(propValuation / 350)
+      }, propUserId || users[0]?.id);
+
+      if (onPropertyAdded) {
+        onPropertyAdded(created);
+      }
+      setIsAddPropertyOpen(false);
+      setPropName('');
+      setPropCity('');
+      setPropState('');
+    } catch (err) {
+      console.error('Error creating property in Neon:', err);
+    }
+  };
+
+  // Handle Add Invoice to Neon
+  const handleAddInvoiceSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!invUserId) return;
+
+    try {
+      const targetUser = users.find(u => u.id === invUserId);
+      const created = await NeonService.createInvoice({
+        userId: invUserId,
+        invoiceNumber: invNumber,
+        amount: invAmount,
+        planTier: targetUser?.planTier || 'pro',
+        dueDate: invDueDate
+      });
+
+      if (created) {
+        setInvoices(prev => [created, ...prev]);
+      }
+      setIsAddInvoiceOpen(false);
+      setInvNumber(`INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`);
+    } catch (err) {
+      console.error('Error creating invoice in Neon:', err);
+    }
   };
 
   return (
@@ -348,6 +433,26 @@ export const AdminView: React.FC<AdminViewProps> = ({ onSelectCustomerPortfolio 
         >
           <CreditCard size={16} />
           <span>Billing & Invoices ({invoices.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('properties')}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            borderBottom: activeSubTab === 'properties' ? '2px solid var(--accent-red)' : '2px solid transparent',
+            padding: '0.75rem 1.25rem',
+            fontWeight: 600,
+            fontSize: '0.875rem',
+            color: activeSubTab === 'properties' ? 'var(--accent-red)' : 'var(--text-muted)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}
+        >
+          <Building2 size={16} />
+          <span>Properties Registry ({properties.length})</span>
         </button>
 
         <button
@@ -726,6 +831,101 @@ export const AdminView: React.FC<AdminViewProps> = ({ onSelectCustomerPortfolio 
         </div>
       )}
 
+      {/* SUB-TAB: NEON PROPERTIES REGISTRY */}
+      {activeSubTab === 'properties' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+            <div>
+              <h2 style={{ fontSize: '1.2rem', fontWeight: 800, margin: '0 0 0.2rem', color: 'var(--text-primary)' }}>
+                Neon Property Registry (Relational Multi-Tenant)
+              </h2>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>
+                Manage physical real estate assets in Neon Postgres. Every asset is tied to an institutional client or master fund.
+              </p>
+            </div>
+
+            <button
+              onClick={() => setIsAddPropertyOpen(true)}
+              className="btn btn-primary"
+              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+            >
+              <Plus size={16} />
+              <span>Register Property in Neon</span>
+            </button>
+          </div>
+
+          <div className="card" style={{ padding: '0', overflow: 'hidden' }}>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                <thead>
+                  <tr style={{ background: 'var(--bg-subtle)', borderBottom: '1px solid var(--border-subtle)', textAlign: 'left', color: 'var(--text-muted)' }}>
+                    <th style={{ padding: '0.85rem 1rem' }}>Asset & Code</th>
+                    <th style={{ padding: '0.85rem 1rem' }}>Asset Class</th>
+                    <th style={{ padding: '0.85rem 1rem' }}>Location</th>
+                    <th style={{ padding: '0.85rem 1rem' }}>Valuation</th>
+                    <th style={{ padding: '0.85rem 1rem' }}>NOI / Cap Rate</th>
+                    <th style={{ padding: '0.85rem 1rem' }}>Occupancy</th>
+                    <th style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {properties.map((p) => (
+                    <tr key={p.id} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                      <td style={{ padding: '0.9rem 1rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                          <Building2 size={15} color="var(--accent-red)" />
+                          <span>{p.name}</span>
+                        </div>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 500 }}>
+                          Code: {p.code} • {(p.rentableSqFt || 0).toLocaleString()} RSF
+                        </span>
+                      </td>
+                      <td style={{ padding: '0.9rem 1rem' }}>
+                        <span style={{
+                          padding: '0.15rem 0.5rem',
+                          borderRadius: '4px',
+                          fontSize: '0.72rem',
+                          fontWeight: 600,
+                          background: 'rgba(220, 38, 38, 0.08)',
+                          color: 'var(--accent-red)'
+                        }}>
+                          {p.assetClass}
+                        </span>
+                      </td>
+                      <td style={{ padding: '0.9rem 1rem', color: 'var(--text-secondary)' }}>
+                        {p.city}, {p.state}
+                      </td>
+                      <td style={{ padding: '0.9rem 1rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                        ${((p.currentValuation || 0) / 1000000).toFixed(1)}M
+                      </td>
+                      <td style={{ padding: '0.9rem 1rem', color: 'var(--text-primary)' }}>
+                        ${((p.netOperatingIncome || 0) / 1000000).toFixed(2)}M / yr ({(p.capRate || 5.5).toFixed(2)}%)
+                      </td>
+                      <td style={{ padding: '0.9rem 1rem', fontWeight: 600, color: '#16A34A' }}>
+                        {(p.physicalOccupancy || 95).toFixed(1)}%
+                      </td>
+                      <td style={{ padding: '0.9rem 1rem', textAlign: 'right' }}>
+                        <button
+                          onClick={() => {
+                            if (onSelectCustomerPortfolio) {
+                              onSelectCustomerPortfolio(p.id, p.name);
+                            }
+                          }}
+                          className="btn btn-secondary btn-sm"
+                          style={{ fontSize: '0.72rem', padding: '0.2rem 0.55rem' }}
+                        >
+                          Inspect Twin
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* SUB-TAB 3: NEON DATABASE SCHEMA & ARCHITECTURE */}
       {activeSubTab === 'neon-schema' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -980,6 +1180,131 @@ export const AdminView: React.FC<AdminViewProps> = ({ onSelectCustomerPortfolio 
                   className="btn btn-primary"
                 >
                   Save Changes to Neon
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* MODAL: ADD PROPERTY TO NEON */}
+      {isAddPropertyOpen && (
+        <div className="modal-backdrop">
+          <div className="modal-card" style={{ maxWidth: '540px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                Register New Property in Neon
+              </h3>
+              <button 
+                onClick={() => setIsAddPropertyOpen(false)}
+                style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: 'var(--text-muted)' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleAddPropertySubmit}>
+              <div className="login-field" style={{ marginBottom: '1rem' }}>
+                <label className="login-label">Property Name</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. 500 Park Avenue Tower"
+                  value={propName}
+                  onChange={(e) => setPropName(e.target.value)}
+                  className="login-input"
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
+                <div className="login-field">
+                  <label className="login-label">City</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. New York"
+                    value={propCity}
+                    onChange={(e) => setPropCity(e.target.value)}
+                    className="login-input"
+                  />
+                </div>
+                <div className="login-field">
+                  <label className="login-label">State</label>
+                  <input
+                    type="text"
+                    placeholder="NY"
+                    value={propState}
+                    onChange={(e) => setPropState(e.target.value)}
+                    className="login-input"
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
+                <div className="login-field">
+                  <label className="login-label">Asset Class</label>
+                  <select
+                    value={propAssetClass}
+                    onChange={(e) => setPropAssetClass(e.target.value)}
+                    className="login-input"
+                  >
+                    <option value="Commercial Office">Commercial Office</option>
+                    <option value="Industrial Logistics">Industrial Logistics</option>
+                    <option value="Multifamily Luxury">Multifamily Luxury</option>
+                    <option value="Life Sciences">Life Sciences</option>
+                  </select>
+                </div>
+                <div className="login-field">
+                  <label className="login-label">Assigned Account / Owner</label>
+                  <select
+                    value={propUserId}
+                    onChange={(e) => setPropUserId(e.target.value)}
+                    className="login-input"
+                  >
+                    {users.map(u => (
+                      <option key={u.id} value={u.id}>
+                        {u.name} ({u.companyName || u.role})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1.25rem' }}>
+                <div className="login-field">
+                  <label className="login-label">Valuation ($)</label>
+                  <input
+                    type="number"
+                    step="1000000"
+                    value={propValuation}
+                    onChange={(e) => setPropValuation(parseFloat(e.target.value) || 0)}
+                    className="login-input"
+                  />
+                </div>
+                <div className="login-field">
+                  <label className="login-label">Net Operating Income ($/yr)</label>
+                  <input
+                    type="number"
+                    step="100000"
+                    value={propNoi}
+                    onChange={(e) => setPropNoi(parseFloat(e.target.value) || 0)}
+                    className="login-input"
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setIsAddPropertyOpen(false)}
+                  className="btn btn-secondary"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                >
+                  Save Property to Neon
                 </button>
               </div>
             </form>

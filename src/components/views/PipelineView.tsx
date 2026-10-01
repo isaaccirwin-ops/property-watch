@@ -64,8 +64,8 @@ export const PipelineView: React.FC<PipelineViewProps> = ({
       >
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-            <span className="badge badge-purple">DEAL SOURCING & AVM ENGINE</span>
-            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>AI-Scored Inbound Pipeline • Submarket Comps Database</span>
+            <span className="badge badge-purple">ACQUISITIONS & CAPITAL ALLOCATION</span>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Institutional Sourcing Pipeline • Submarket Comps Database</span>
           </div>
           <h1 style={{ fontSize: '1.65rem', fontWeight: 800 }}>Acquisition Pipeline & Comps Engine</h1>
           <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
@@ -113,7 +113,7 @@ export const PipelineView: React.FC<PipelineViewProps> = ({
               <div 
                 key={stage} 
                 style={{ 
-                  background: 'rgba(14, 20, 32, 0.5)', 
+                  background: 'var(--bg-subtle)', 
                   border: '1px solid var(--border-subtle)', 
                   borderRadius: 'var(--radius-lg)', 
                   padding: '0.85rem',
@@ -145,8 +145,8 @@ export const PipelineView: React.FC<PipelineViewProps> = ({
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <span className="badge badge-purple" style={{ fontSize: '0.62rem' }}>{deal.assetClass}</span>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '2px', background: 'rgba(16, 185, 129, 0.15)', color: 'var(--accent-emerald)', padding: '0.15rem 0.4rem', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 700, fontFamily: 'var(--font-mono)' }}>
-                        <Sparkles size={11} /> AI Score: {deal.aiDealScore}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '3px', background: 'rgba(22, 163, 74, 0.12)', color: 'var(--accent-emerald)', padding: '0.15rem 0.45rem', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 700, fontFamily: 'var(--font-mono)' }}>
+                        Score: {deal.aiDealScore}/100
                       </div>
                     </div>
 
